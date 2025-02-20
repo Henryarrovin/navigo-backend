@@ -36,3 +36,13 @@ export const createProduct: RequestHandler = async (req: Request, res: Response)
         res.status(500).json({ error: "Error creating product" });
     }
 }
+
+export const getAllProducts = async (req: Request, res: Response) => {
+    try {
+        const products = await ProductModel.find();
+        res.status(200).json(products);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ error: "Error fetching products" });
+    }
+}
