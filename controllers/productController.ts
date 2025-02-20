@@ -46,3 +46,18 @@ export const getAllProducts = async (req: Request, res: Response) => {
         res.status(500).json({ error: "Error fetching products" });
     }
 }
+
+export const getProductById = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const product = await ProductModel.findById(id);
+        if (!product) {
+            res.status(404).json({ error: "Product not found" });
+            return;
+        }
+        res.status(200).json(product);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ error: "Error fetching product" });
+    }
+}
