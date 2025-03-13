@@ -1,9 +1,9 @@
 import dotenv from 'dotenv';
 import { cors } from 'hono/cors';
-import productRoutes from './routes/productRoutes';
 import connectDB from './config/db';
 import { Hono } from 'hono';
 import { serve } from 'bun';
+import router from './routes';
 
 dotenv.config();
 
@@ -18,7 +18,7 @@ app.use(
     })
   );
 
-app.route("/api/products", productRoutes);
+app.route("/api", router);
 
 const port = 8080;
 serve(app);
