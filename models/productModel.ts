@@ -1,29 +1,27 @@
 import mongoose from "mongoose";
 
-interface Coordinates {
+interface ICoordinates {
     x: number;
     y: number;
 }
 
-interface Product extends mongoose.Document {
+interface IProduct extends mongoose.Document {
     name: string;
-    category: string;
-    description: string;
+    category: mongoose.Schema.Types.ObjectId;
+    description?: string;
     price: number;
-    image: string;
-    coordinates: Coordinates;
+    image?: string;
+    coordinates?: ICoordinates;
 }
 
-const productSchema = new mongoose.Schema<Product>({
+const productSchema = new mongoose.Schema<IProduct>({
     name: { type: String, required: true },
-    category: { type: String, required: true },
-    description: { type: String, required: true },
+    category: { type: mongoose.Schema.Types.ObjectId, ref: "Category", required: true },
+    description: String,
     price: { type: Number, required: true },
-    image: { type: String, required: true },
-    coordinates: {
-        x: { type: Number, required: true },
-        y: { type: Number, required: true },
-    },
+    image: String,
+    coordinates: { x: Number, y: Number },
 });
 
-export const ProductModel = mongoose.model<Product>("Product", productSchema);
+const ProductModel = mongoose.model<IProduct>("Product", productSchema);
+export default ProductModel;

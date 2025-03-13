@@ -1,23 +1,25 @@
-import express from 'express';
-import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import cors from 'cors';
+import { cors } from 'hono/cors';
 import productRoutes from './routes/productRoutes';
+import connectDB from './config/db';
+import { Hono } from 'hono';
+import { serve } from 'bun';
 
 dotenv.config();
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+const app = new Hono();
+
+connectDB();
+
+app.use(
+    cors({
+      origin: "*",
+      allowMethods: ["GET", "POST", "PUT", "DELETE"],
+    })
+  );
+
+app.route("/api/products", productRoutes);
+
 const port = 8080;
-
-mongoose
-    .connect(process.env.MONGO_URI as string)
-    .then(() => console.log("Connected to MongoDB"))
-    .catch((error) => console.log("Error connecting to MongoDB:", error.message));
-
-app.use("/api", productRoutes);
-
-app.listen(port, () => {
-  console.log(`Server is running at http://localhost:${port}`);
-});
+serve(app);
+console.log(`Server running on http://localhost:${port}`);

@@ -1,14 +1,18 @@
-import express from 'express';
-import { hello } from '../controllers/greetingsController';
-import { createProduct, deleteProduct, getAllProducts, getProductById, updateProduct } from '../controllers/productController';
+import { Hono } from "hono";
+import {
+    createProduct,
+    getAllProducts,
+    getProductById,
+    updateProduct,
+    deleteProduct
+} from "../controllers/productController";
 
-const router = express.Router();
+const productRouter = new Hono();
 
-router.get('/hello', hello);
-router.post('/product', createProduct);
-router.get('/product', getAllProducts);
-router.get('/product/:id', getProductById);
-router.put('/product/:id', updateProduct);
-router.delete('/product/:id', deleteProduct);
+productRouter.post("/", createProduct);
+productRouter.get("/", getAllProducts);
+productRouter.get("/:id", getProductById);
+productRouter.put("/:id", updateProduct);
+productRouter.delete("/:id", deleteProduct);
 
-export default router;
+export default productRouter;

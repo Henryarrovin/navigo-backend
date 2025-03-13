@@ -4,16 +4,14 @@
   "type": "module",
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^5.0.0"
+    "@types/cors": "^2.8.17"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2",
+    "hono": "^4.7.4",
     "mongoose": "^8.10.1"
   }
 }
