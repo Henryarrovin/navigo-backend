@@ -4,18 +4,13 @@ import Category from "../models/categoryModel";
 export const createCategory = async (c: Context) => {
     try {
         const body = await c.req.json();
-        const { id, name } = body;
+        const { name } = body;
 
-        if (!id || !name) {
-            return c.json({ error: "Please provide both id and name" }, 400);
+        if (!name) {
+            return c.json({ error: "Please provide name" }, 400);
         }
 
-        const categoryExists = await Category.findOne({ id });
-        if (categoryExists) {
-            return c.json({ error: "Category ID already exists" }, 400);
-        }
-
-        const newCategory = await Category.create({ id, name });
+        const newCategory = await Category.create({ name });
 
         return c.json({
             message: "Category created successfully",
@@ -40,7 +35,7 @@ export const getAllCategories = async (c: Context) => {
 export const getCategoryById = async (c: Context) => {
     try {
         const id = c.req.param("id");
-        const category = await Category.findOne({ id });
+        const category = await Category.findById(id);
 
         if (!category) {
             return c.json({ error: "Category not found" }, 404);
@@ -63,7 +58,7 @@ export const updateCategory = async (c: Context) => {
             return c.json({ error: "Please provide a name" }, 400);
         }
 
-        const updatedCategory = await Category.findOneAndUpdate({ id }, { name }, { new: true });
+        const updatedCategory = await Category.findByIdAndUpdate(id, { name }, { new: true });
 
         if (!updatedCategory) {
             return c.json({ error: "Category not found" }, 404);
@@ -82,7 +77,7 @@ export const updateCategory = async (c: Context) => {
 export const deleteCategory = async (c: Context) => {
     try {
         const id = c.req.param("id");
-        const deletedCategory = await Category.findOneAndDelete({ id });
+        const deletedCategory = await Category.findByIdAndDelete(id);
 
         if (!deletedCategory) {
             return c.json({ error: "Category not found" }, 404);
