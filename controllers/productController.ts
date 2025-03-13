@@ -14,7 +14,7 @@ export const createProduct = async (c: Context) => {
 
         const categoryExists = await Category.findById(category);
         if (!categoryExists) {
-            return c.json({ error: "Category does not exist" }, 400);
+            return c.json({ error: "Category does not exist" }, 404);
         }
 
         const newProduct = await Product.create({
