@@ -21,5 +21,8 @@ app.use(
 app.route("/api", router);
 
 const port = 8080;
-serve(app);
+serve({
+    fetch: app.fetch,
+    port: port,
+});
 console.log(`Server running on http://localhost:${port}`);
