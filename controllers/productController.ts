@@ -1,23 +1,23 @@
-import type { Request, RequestHandler, Response } from "express";
-import { ProductModel } from "../models/productModel";
+import type { Context } from "hono";
+import Product from "../models/productModel";
+import Category from "../models/categoryModel";
 
-export const createProduct: RequestHandler = async (req: Request, res: Response) => {
+export const createProduct = async (c: Context) => {
     try {
-        const {
-            name,
-            category,
-            description,
-            price,
-            image,
-            coordinates
-        } = req.body;
+        const body = await c.req.json();
+        const { name, category, description, price, image, coordinates } = body;
 
-        if (!name || !category || !description || !price || !image || !coordinates || typeof coordinates.x !== 'number' || typeof coordinates.y !== 'number') {
-            res.status(400).json({ error: "Please fill in all fields" });
-            return;
+        if (!name || !category || !description || !price || !image || !coordinates || 
+            typeof coordinates.x !== 'number' || typeof coordinates.y !== 'number') {
+            return c.json({ error: "Please fill in all fields" }, 400);
         }
 
-        const newProduct = new ProductModel({
+        const categoryExists = await Category.findById(category);
+        if (!categoryExists) {
+            return c.json({ error: "Category does not exist" }, 400);
+        }
+
+        const newProduct = await Product.create({
             name,
             category,
             description,
@@ -25,133 +25,95 @@ export const createProduct: RequestHandler = async (req: Request, res: Response)
             image,
             coordinates
         });
-        await newProduct.save();
 
-        res.status(201).json({
+        return c.json({
             message: "Product created successfully",
             product: newProduct
-        });
+        }, 201);
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: "Error creating product" });
+        console.error(error);
+        return c.json({ error: "Error creating product" }, 500);
     }
-}
+};
 
-export const getAllProducts = async (req: Request, res: Response) => {
+export const getAllProducts = async (c: Context) => {
     try {
-        const products = await ProductModel.find();
-        res.status(200).json(products);
+        const products = await Product.find().populate("category");
+        return c.json(products);
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: "Error fetching products" });
+        console.error(error);
+        return c.json({ error: "Error fetching products" }, 500);
     }
-}
+};
 
-export const getProductById = async (req: Request, res: Response) => {
+export const getProductById = async (c: Context) => {
     try {
-        const { id } = req.params;
-        const product = await ProductModel.findById(id);
+        const id = c.req.param("id");
+        const product = await Product.findById(id).populate("category");
         
         if (!product) {
-            res.status(404).json({ error: "Product not found" });
-            return;
+            return c.json({ error: "Product not found" }, 404);
         }
-        res.status(200).json(product);
+        return c.json(product);
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: "Error fetching product" });
+        console.error(error);
+        return c.json({ error: "Error fetching product" }, 500);
     }
-}
+};
 
-// export const updateProduct = async (req: Request, res: Response) => {
-//     try {
-//         const { id } = req.params;
-//         const {
-//             name,
-//             category,
-//             description,
-//             price,
-//             image,
-//             coordinates
-//         } = req.body;   
-
-//         if (!name || !category || !description || !price || !image || !coordinates || typeof coordinates.x !== 'number' || typeof coordinates.y !== 'number') {
-//             res.status(400).json({ error: "Please fill in all fields" });
-//             return;
-//         }
-
-//         const updatedProduct = await ProductModel.findByIdAndUpdate(id, {
-//             name,
-//             category,
-//             description,
-//             price,
-//             image,
-//             coordinates
-//         }, { new: true });
-
-//         if (!updatedProduct) {
-//             res.status(404).json({ error: "Product not found" });
-//             return;
-//         }
-
-//         res.status(200).json({
-//             message: "Product updated successfully",
-//             product: updatedProduct
-//         });
-//     } catch (error) {
-//         console.log(error);
-//         res.status(500).json({ error: "Error updating product" });
-//     }
-// }
-
-export const updateProduct: RequestHandler = async (req: Request, res: Response) => {
+export const updateProduct = async (c: Context) => {
     try {
-        const { id } = req.params;
+        const id = c.req.param("id");
+        const body = await c.req.json();
         const updateData: any = {};
 
-        if (req.body.name) updateData.name = req.body.name;
-        if (req.body.category) updateData.category = req.body.category;
-        if (req.body.description) updateData.description = req.body.description;
-        if (req.body.price) updateData.price = req.body.price;
-        if (req.body.image) updateData.image = req.body.image;
-        if (req.body.coordinates) {
-            if (typeof req.body.coordinates.x === 'number') updateData["coordinates.x"] = req.body.coordinates.x;
-            if (typeof req.body.coordinates.y === 'number') updateData["coordinates.y"] = req.body.coordinates.y;
+        if (body.name) updateData.name = body.name;
+        if (body.category) {
+            const categoryExists = await Category.findById(body.category);
+            if (!categoryExists) {
+                return c.json({ error: "Category does not exist" }, 400);
+            }
+            updateData.category = body.category;
+        }
+        if (body.description) updateData.description = body.description;
+        if (body.price) updateData.price = body.price;
+        if (body.image) updateData.image = body.image;
+        if (body.coordinates) {
+            if (typeof body.coordinates.x === 'number') updateData["coordinates.x"] = body.coordinates.x;
+            if (typeof body.coordinates.y === 'number') updateData["coordinates.y"] = body.coordinates.y;
         }
 
-        const updatedProduct = await ProductModel.findByIdAndUpdate(id, updateData, { new: true });
+        const updatedProduct = await Product.findByIdAndUpdate(id, updateData, { new: true });
 
         if (!updatedProduct) {
-            res.status(404).json({ error: "Product not found" });
-            return;
+            return c.json({ error: "Product not found" }, 404);
         }
 
-        res.status(200).json({
+        return c.json({
             message: "Product updated successfully",
             product: updatedProduct
         });
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: "Error updating product" });
+        console.error(error);
+        return c.json({ error: "Error updating product" }, 500);
     }
 };
 
-export const deleteProduct = async (req: Request, res: Response) => {
+export const deleteProduct = async (c: Context) => {
     try {
-        const { id } = req.params;
-        const deletedProduct = await ProductModel.findByIdAndDelete(id);
+        const id = c.req.param("id");
+        const deletedProduct = await Product.findByIdAndDelete(id);
 
         if (!deletedProduct) {
-            res.status(404).json({ error: "Product not found" });
-            return;
+            return c.json({ error: "Product not found" }, 404);
         }
 
-        res.status(200).json({
+        return c.json({
             message: "Product deleted successfully",
             product: deletedProduct
         });
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: "Error deleting product" });
+        console.error(error);
+        return c.json({ error: "Error deleting product" }, 500);
     }
-}
+};
