@@ -143,3 +143,25 @@ export const deleteProduct = async (c: Context) => {
         return c.json({ error: "Error deleting product" }, 500);
     }
 };
+
+export const getProductsByCategory = async (c: Context) => {
+    try {
+        const categoryId = c.req.param("categoryId");
+
+        const categoryExists = await Category.findById(categoryId);
+        if (!categoryExists) {
+            return c.json({ error: "Category not found" }, 404);
+        }
+
+        const products = await Product.find({ category: categoryId }).populate("category");
+
+        if (products.length === 0) {
+            return c.json({ message: "No products found for this category" }, 404);
+        }
+
+        return c.json(products);
+    } catch (error) {
+        console.error(error);
+        return c.json({ error: "Error fetching products by category" }, 500);
+    }
+};
