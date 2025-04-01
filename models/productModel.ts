@@ -33,7 +33,7 @@ const productSchema = new mongoose.Schema<IProduct>({
 });
 
 // Create 2d index for spatial queries
-productSchema.index({ "location.coordinates": "2dsphere" });
+// productSchema.index({ "location.coordinates": "2d" });
 
 const Product = mongoose.model<IProduct>("Product", productSchema);
 export default Product;
