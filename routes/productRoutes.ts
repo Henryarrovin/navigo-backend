@@ -4,7 +4,8 @@ import {
     getAllProducts,
     getProductById,
     updateProduct,
-    deleteProduct
+    deleteProduct,
+    getProductsByCategory
 } from "../controllers/productController";
 
 const productRouter = new Hono();
@@ -14,5 +15,7 @@ productRouter.get("/", getAllProducts);
 productRouter.get("/:id", getProductById);
 productRouter.put("/:id", updateProduct);
 productRouter.delete("/:id", deleteProduct);
+
+productRouter.get("/category/:categoryId", getProductsByCategory);
 
 export default productRouter;
