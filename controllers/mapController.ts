@@ -240,3 +240,43 @@ export const getProductsInZone = async (c: Context) => {
         return c.json({ error: "Error fetching products in zone" }, 500);
     }
 };
+
+
+export const getAllZones = async (c: Context) => {
+    try {
+        const zones = await MapZone.find();
+        return c.json(zones);
+    } catch (error) {
+        console.error(error);
+        return c.json({ error: "Error fetching zones" }, 500);
+    }
+};
+
+export const updateZoneById = async (c: Context) => {
+    try {
+        const id = c.req.param("id");
+        const updateData = await c.req.json();
+
+        if (Object.keys(updateData).length === 0) {
+            return c.json({ error: "No update data provided" }, 400);
+        }
+
+        const updatedZone = await MapZone.findByIdAndUpdate(
+            id,
+            { $set: updateData },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedZone) {
+            return c.json({ error: "Zone not found" }, 404);
+        }
+
+        return c.json({
+            message: "Zone updated successfully",
+            zone: updatedZone
+        });
+    } catch (error) {
+        console.error(error);
+        return c.json({ error: "Error updating zone" }, 500);
+    }
+};
