@@ -2,6 +2,23 @@ import type { Context } from "hono";
 import Product from "../models/productModel";
 import Category from "../models/categoryModel";
 
+interface Coordinates {
+    x: number;
+    y: number;
+}
+
+interface Product {
+    name: string;
+    category: string;
+    description: string;
+    price: number;
+    image: string;
+    location: {
+        coordinates: Coordinates;
+        zone: string;
+    };
+}
+
 export const createProduct = async (c: Context) => {
     try {
         const body = await c.req.json();
@@ -65,7 +82,7 @@ export const getProductById = async (c: Context) => {
 export const updateProduct = async (c: Context) => {
     try {
         const id = c.req.param("id");
-        const body = await c.req.json();
+        const body: Product = await c.req.json();
         const updateData: any = {};
 
         if (body.name) updateData.name = body.name;
@@ -79,9 +96,17 @@ export const updateProduct = async (c: Context) => {
         if (body.description) updateData.description = body.description;
         if (body.price) updateData.price = body.price;
         if (body.image) updateData.image = body.image;
-        if (body.coordinates) {
-            if (typeof body.coordinates.x === 'number') updateData["coordinates.x"] = body.coordinates.x;
-            if (typeof body.coordinates.y === 'number') updateData["coordinates.y"] = body.coordinates.y;
+        // if (body.coordinates) {
+        //     if (typeof body.coordinates.x === 'number') updateData["coordinates.x"] = body.coordinates.x;
+        //     if (typeof body.coordinates.y === 'number') updateData["coordinates.y"] = body.coordinates.y;
+        // }
+
+        if (body.location) {
+            if (body.location.coordinates) {
+                if (typeof body.location.coordinates.x === 'number') updateData["location.coordinates.x"] = body.location.coordinates.x;
+                if (typeof body.location.coordinates.y === 'number') updateData["location.coordinates.y"] = body.location.coordinates.y;
+            }
+            if (body.location.zone) updateData["location.zone"] = body.location.zone;
         }
 
         const updatedProduct = await Product.findByIdAndUpdate(id, updateData, { new: true });
