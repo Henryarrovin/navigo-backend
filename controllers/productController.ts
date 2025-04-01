@@ -5,10 +5,11 @@ import Category from "../models/categoryModel";
 export const createProduct = async (c: Context) => {
     try {
         const body = await c.req.json();
-        const { name, category, description, price, image, coordinates } = body;
+        const { name, category, description, price, image, location } = body;
 
-        if (!name || !category || !description || !price || !image || !coordinates || 
-            typeof coordinates.x !== 'number' || typeof coordinates.y !== 'number') {
+        if (!name || !category || !description || !price || !image || !location.coordinates || 
+            !location.zone || typeof location.coordinates.x !== 'number' || typeof location.coordinates.y !== 'number'
+        ) {
             return c.json({ error: "Please fill in all fields" }, 400);
         }
 
@@ -23,7 +24,7 @@ export const createProduct = async (c: Context) => {
             description,
             price,
             image,
-            coordinates
+            location
         });
 
         return c.json({
