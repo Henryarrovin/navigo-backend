@@ -54,10 +54,42 @@ export const createProduct = async (c: Context) => {
     }
 };
 
+// export const getAllProducts = async (c: Context) => {
+//     try {
+//         const products = await Product.find().populate("category");
+//         return c.json(products);
+//     } catch (error) {
+//         console.error(error);
+//         return c.json({ error: "Error fetching products" }, 500);
+//     }
+// };
+
 export const getAllProducts = async (c: Context) => {
     try {
-        const products = await Product.find().populate("category");
-        return c.json(products);
+        const page = parseInt(c.req.query('page') ?? '1');
+        const limit = parseInt(c.req.query('limit') ?? '10');
+        const skip = (page - 1) * limit;
+
+        // Get total count for pagination info
+        const total = await Product.countDocuments();
+        
+        // Fetch paginated products
+        const products = await Product.find()
+            .populate("category")
+            .skip(skip)
+            .limit(limit);
+
+        return c.json({
+            data: products,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: page < Math.ceil(total / limit),
+                hasPrevPage: page > 1
+            }
+        });
     } catch (error) {
         console.error(error);
         return c.json({ error: "Error fetching products" }, 500);
