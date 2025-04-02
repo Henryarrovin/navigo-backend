@@ -70,10 +70,10 @@ export const getAllProducts = async (c: Context) => {
         const limit = parseInt(c.req.query('limit') ?? '10');
         const skip = (page - 1) * limit;
 
-        // Get total count for pagination info
+        // Get total count for pagination info (total products)
         const total = await Product.countDocuments();
         
-        // Fetch paginated products
+        // get paginated products
         const products = await Product.find()
             .populate("category")
             .skip(skip)
