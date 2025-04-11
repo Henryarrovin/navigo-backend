@@ -20,6 +20,7 @@ interface IMapZone extends mongoose.Document {
     isNavigable: boolean;
     adjacentZones: IAdjacentZone[] | null;
     containedIn: mongoose.Schema.Types.ObjectId | null;
+    innerZones: mongoose.Schema.Types.ObjectId[] | null;
     svgPath: string;
 }
 
@@ -45,6 +46,10 @@ const mapZoneSchema = new mongoose.Schema<IMapZone>({
         }
     }],
     containedIn: { type: mongoose.Schema.Types.ObjectId, ref: "MapZone", required: false },
+    innerZones: [{ 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: "MapZone" 
+    }],
     svgPath: { type: String, required: true }
 });
 
