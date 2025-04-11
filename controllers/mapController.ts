@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import MapZone from "../models/mapModel";
 import Product from "../models/productModel";
+import mongoose from "mongoose";
 
 interface AStarNode {
     zone: any;
@@ -51,13 +52,47 @@ export const findPath = async (c: Context) => {
     }
 };
 
-async function findZoneByCoordinates(x: number, y: number): Promise<any> {
-    // Find all zones and check which one contains the point
-    // This is a simplified approach - you might need a more efficient spatial query
-    const allZones = await MapZone.find({ isNavigable: true });
+// async function findZoneByCoordinates(x: number, y: number): Promise<any> {
+//     // Find all zones and check which one contains the point
+//     // const allZones = await MapZone.find({ isNavigable: true });
     
-    for (const zone of allZones) {
+//     // for (const zone of allZones) {
+//     //     if (pointInPolygon({ x, y }, zone.vertices)) {
+//     //         return zone;
+//     //     }
+//     // }
+//     // return null;
+
+//     const navigableZones = await MapZone.find({ isNavigable: true });
+    
+//     for (const zone of navigableZones) {
+//         if (pointInPolygon({ x, y }, zone.vertices)) {
+//             // Check if point is actually in a non-navigable inner zone
+//             const innerZones = await MapZone.find({ containedIn: zone._id, isNavigable: false });
+//             for (const innerZone of innerZones) {
+//                 if (pointInPolygon({ x, y }, innerZone.vertices)) {
+//                     return null; // Point is in an obstacle
+//                 }
+//             }
+//             return zone;
+//         }
+//     }
+//     return null;
+// }
+
+async function findZoneByCoordinates(x: number, y: number): Promise<any> {
+    const navigableZones = await MapZone.find({ isNavigable: true });
+    for (const zone of navigableZones) {
         if (pointInPolygon({ x, y }, zone.vertices)) {
+            const innerZones = await MapZone.find({ 
+                containedIn: zone._id, 
+                isNavigable: false 
+            });
+            for (const innerZone of innerZones) {
+                if (pointInPolygon({ x, y }, innerZone.vertices)) {
+                    return null;
+                }
+            }
             return zone;
         }
     }
@@ -188,7 +223,9 @@ function calculatePathDistance(path: any[]): number {
 export const getZoneById = async (c: Context) => {
     try {
         const id = c.req.param("id");
-        const zone = await MapZone.findById(id);
+        const zone = await MapZone.findById(id)
+            .populate("containedIn")
+            .populate("innerZones");
         
         if (!zone) {
             return c.json({ error: "Zone not found" }, 404);
@@ -201,10 +238,32 @@ export const getZoneById = async (c: Context) => {
     }
 };
 
+function isPolygonInsidePolygon(inner: { x: number; y: number }[], outer: { x: number; y: number }[]): boolean {
+    for (const point of inner) {
+        if (!pointInPolygon(point, outer)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 export const createZone = async (c: Context) => {
     try {
         const body = await c.req.json();
-        const { name, floor, vertices, isNavigable, adjacentZones, svgPath } = body;
+        const { name, floor, vertices, isNavigable, adjacentZones, containedIn,svgPath } = body;
+
+        if (containedIn) {
+            const parentZone = await MapZone.findById(containedIn);
+            if (!parentZone) {
+                return c.json({ error: "Parent zone not found" }, 404);
+            }
+            if (!parentZone.isNavigable) {
+                return c.json({ error: "Parent zone must be navigable" }, 400);
+            }
+            if (containedIn && !isPolygonInsidePolygon(vertices, parentZone.vertices)) {
+                return c.json({ error: "Inner zone must be completely contained within parent zone" }, 400);
+            }
+        }
         
         if (!name || !floor || !vertices || !Array.isArray(vertices) || vertices.length < 3 || !svgPath) {
             return c.json({ error: "Please provide all required fields" }, 400);
@@ -216,8 +275,17 @@ export const createZone = async (c: Context) => {
             vertices,
             isNavigable: isNavigable !== false,
             adjacentZones: adjacentZones || [],
+            containedIn: containedIn || null,
             svgPath
         });
+
+        if (containedIn) {
+            await MapZone.findByIdAndUpdate(
+                containedIn,
+                { $addToSet: { innerZones: newZone._id } },
+                { new: true }
+            );
+        }
         
         return c.json({
             message: "Zone created successfully",
@@ -242,9 +310,31 @@ export const getProductsInZone = async (c: Context) => {
 };
 
 
+// export const getAllZones = async (c: Context) => {
+//     try {
+//         const zones = await MapZone.find();
+//         return c.json(zones);
+//     } catch (error) {
+//         console.error(error);
+//         return c.json({ error: "Error fetching zones" }, 500);
+//     }
+// };
+
 export const getAllZones = async (c: Context) => {
     try {
-        const zones = await MapZone.find();
+        const { navigable } = c.req.query();
+        
+        const query: Record<string, any> = {};
+        if (navigable === 'true') {
+            query.isNavigable = true;
+        } else if (navigable === 'false') {
+            query.isNavigable = false;
+        }
+        
+        const zones = await MapZone.find(query)
+            .populate('containedIn')
+            .populate('innerZones');
+        
         return c.json(zones);
     } catch (error) {
         console.error(error);
@@ -259,6 +349,14 @@ export const updateZoneById = async (c: Context) => {
 
         if (Object.keys(updateData).length === 0) {
             return c.json({ error: "No update data provided" }, 400);
+        }
+
+        if (updateData.containedIn) {
+            // Remove from old parent's innerZones
+            await MapZone.updateMany(
+                { innerZones: id },
+                { $pull: { innerZones: id } }
+            );
         }
 
         const updatedZone = await MapZone.findByIdAndUpdate(
