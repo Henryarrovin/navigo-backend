@@ -18,6 +18,58 @@ function calculateDistance(point1: { x: number; y: number }, point2: { x: number
     return Math.sqrt(Math.pow(point2.x - point1.x, 2) + Math.pow(point2.y - point1.y, 2));
 }
 
+async function lineCrossesNonNavigableZone(line: { from: { x: number; y: number }, to: { x: number; y: number } }): Promise<boolean> {
+    const nonNavigableZones = await MapZone.find({ isNavigable: false });
+    
+    const steps = 5;
+    for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const checkPoint = {
+            x: line.from.x + t * (line.to.x - line.from.x),
+            y: line.from.y + t * (line.to.y - line.from.y)
+        };
+        
+        for (const zone of nonNavigableZones) {
+            if (pointInPolygon(checkPoint, zone.vertices)) {
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
+function linesIntersect(line1: any, line2: any): boolean {
+    const a1 = line1.to.y - line1.from.y;
+    const b1 = line1.from.x - line1.to.x;
+    const c1 = a1 * line1.from.x + b1 * line1.from.y;
+
+    const a2 = line2.to.y - line2.from.y;
+    const b2 = line2.from.x - line2.to.x;
+    const c2 = a2 * line2.from.x + b2 * line2.from.y;
+
+    const determinant = a1 * b2 - a2 * b1;
+
+    if (determinant === 0) {
+        return false;
+    }
+
+    const x = (b2 * c1 - b1 * c2) / determinant;
+    const y = (a1 * c2 - a2 * c1) / determinant;
+
+    return (
+        isBetween(x, line1.from.x, line1.to.x) &&
+        isBetween(y, line1.from.y, line1.to.y) &&
+        isBetween(x, line2.from.x, line2.to.x) &&
+        isBetween(y, line2.from.y, line2.to.y)
+    );
+}
+
+function isBetween(value: number, a: number, b: number): boolean {
+    return value >= Math.min(a, b) && value <= Math.max(a, b);
+}
+
+
 export const findPath = async (c: Context) => {
     try {
         const { start, end } = await c.req.json();
@@ -117,7 +169,6 @@ async function aStarPathfinding(startZone: any, endZone: any, startPoint: { x: n
     const openSet: AStarNode[] = [];
     const closedSet: AStarNode[] = [];
     
-    // Start node
     const startNode: AStarNode = {
         zone: startZone,
         parent: null,
@@ -131,11 +182,9 @@ async function aStarPathfinding(startZone: any, endZone: any, startPoint: { x: n
     openSet.push(startNode);
     
     while (openSet.length > 0) {
-        // Get node with lowest f score
         openSet.sort((a, b) => a.f - b.f);
         const currentNode = openSet.shift()!;
         
-        // Check if we've reached the end zone
         if (currentNode.zone._id.equals(endZone._id)) {
             // Reconstruct path
             const path = [];
@@ -150,14 +199,17 @@ async function aStarPathfinding(startZone: any, endZone: any, startPoint: { x: n
                 node = node.parent;
             }
             
-            // Add the final point to the end zone
             path.push({
                 zone: endZone,
                 entryPoint: endPoint,
                 exitPoint: endPoint
             });
             
-            return path;
+            // Validate the complete path
+            if (await validatePath(path)) {
+                return path;
+            }
+            return [];
         }
         
         closedSet.push(currentNode);
@@ -167,11 +219,18 @@ async function aStarPathfinding(startZone: any, endZone: any, startPoint: { x: n
             const adjacentZone = await MapZone.findById(adjacent.zone);
             if (!adjacentZone || !adjacentZone.isNavigable) continue;
             
-            // Calculate tentative g score
-            const connectionPoint = adjacent.connectionPoints.from;
-            const exitPoint = adjacent.connectionPoints.to;
+            // Check if the connection crosses any non-navigable zones
+            const connectionLine = {
+                from: currentNode.exitPoint,
+                to: adjacent.connectionPoints.to
+            };
             
-            const distanceFromCurrent = calculateDistance(currentNode.exitPoint, connectionPoint);
+            if (await lineCrossesNonNavigableZone(connectionLine)) {
+                continue;
+            }
+            
+            // Calculate tentative g score
+            const distanceFromCurrent = calculateDistance(currentNode.exitPoint, adjacent.connectionPoints.from);
             const tentativeG = currentNode.g + distanceFromCurrent;
             
             // Check if this zone is already in closed set with a better g score
@@ -182,7 +241,7 @@ async function aStarPathfinding(startZone: any, endZone: any, startPoint: { x: n
             let openNode = openSet.find(n => n.zone._id.equals(adjacentZone._id));
             
             if (!openNode || tentativeG < openNode.g) {
-                const h = calculateDistance(exitPoint, endPoint);
+                const h = calculateDistance(adjacent.connectionPoints.to, endPoint);
                 
                 if (!openNode) {
                     openNode = {
@@ -191,8 +250,8 @@ async function aStarPathfinding(startZone: any, endZone: any, startPoint: { x: n
                         g: tentativeG,
                         h,
                         f: tentativeG + h,
-                        entryPoint: connectionPoint,
-                        exitPoint
+                        entryPoint: adjacent.connectionPoints.from,
+                        exitPoint: adjacent.connectionPoints.to
                     };
                     openSet.push(openNode);
                 } else {
@@ -200,14 +259,46 @@ async function aStarPathfinding(startZone: any, endZone: any, startPoint: { x: n
                     openNode.g = tentativeG;
                     openNode.h = h;
                     openNode.f = tentativeG + h;
-                    openNode.entryPoint = connectionPoint;
-                    openNode.exitPoint = exitPoint;
+                    openNode.entryPoint = adjacent.connectionPoints.from;
+                    openNode.exitPoint = adjacent.connectionPoints.to;
                 }
             }
         }
     }
     
-    return []; // No path found
+    return [];
+}
+
+async function validatePath(path: any[]): Promise<boolean> {
+    const nonNavigableZones = await MapZone.find({ isNavigable: false });
+    
+    for (let i = 1; i < path.length; i++) {
+        const pathSegment = {
+            from: path[i-1].exitPoint,
+            to: path[i].entryPoint
+        };
+        
+        for (const zone of nonNavigableZones) {
+            const zoneVertices = zone.vertices;
+            for (let j = 0, k = zoneVertices.length - 1; j < zoneVertices.length; k = j++) {
+                const zoneSegment = {
+                    from: zoneVertices[k],
+                    to: zoneVertices[j]
+                };
+                
+                if (linesIntersect(pathSegment, zoneSegment)) {
+                    return false;
+                }
+            }
+            
+            if (pointInPolygon(pathSegment.from, zone.vertices) || 
+                pointInPolygon(pathSegment.to, zone.vertices)) {
+                return false;
+            }
+        }
+    }
+    
+    return true;
 }
 
 function calculatePathDistance(path: any[]): number {
